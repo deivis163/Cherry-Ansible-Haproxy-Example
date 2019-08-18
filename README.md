@@ -1,4 +1,4 @@
-# Cherry-Ansible-Haproxy-Example
+# Cherry-Ansible-Firewalled-Haproxy-Example
 
 Requirements:
 
