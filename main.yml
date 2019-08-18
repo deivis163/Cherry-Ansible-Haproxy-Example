@@ -1,0 +1,173 @@
+- name: Cherry Servers API module
+  connection: local
+  hosts: localhost
+  tasks:
+  - name: Deploy CherryServers Server
+    cherryservers_server:
+      hostname:
+        - server%02d.dmtest.com
+      plan_id: '94'
+      project_id: '87793'
+      image: 'Ubuntu 18.04 64bit'
+      region: 'EU-East-1'
+      ssh_label:
+        - SSHKEY
+      state: active
+      count: 3
+      count_offset: 1
+
+    register: machine
+
+  - name: install haproxy
+    apt: name=haproxy state=present
+    delegate_to: '{{ machine.server[0].ip_addresses[0].address }}'
+
+  - name: Move original conf file
+    command: mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.original
+    delegate_to: '{{ machine.server[0].ip_addresses[0].address }}'
+
+  - name: Haproxy
+    template:
+      src: templates/haproxy.cfg
+      dest: /etc/haproxy/haproxy.cfg
+    delegate_to: '{{ machine.server[0].ip_addresses[0].address }}'
+
+  - name: install apache2
+    apt: name=apache2 state=present
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: Move original index.html file
+    command: mv /var/www/html/index.html /var/www/html/index.html.original
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - copy:
+     content: |
+      Server main IP: {{ machine.server[1].ip_addresses[0].address }}
+     dest: /var/www/html/index.html
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: restart apache2
+    service: name=apache2 state=restarted
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: install apache2
+    apt: name=apache2 state=present
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - copy:
+     content: |
+      Server main IP: {{ machine.server[2].ip_addresses[0].address }}
+     dest: /var/www/html/index.html
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - name: restart apache2
+    service: name=apache2 state=restarted
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - name: haproxy restart
+    service: name=haproxy state=restarted
+    delegate_to: '{{ machine.server[0].ip_addresses[0].address }}'
+#fw-----
+  - name: Firewall rule - allow established connections
+    iptables:
+      chain: INPUT
+      ctstate: ESTABLISHED,RELATED
+      jump: ACCEPT
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - name: Allow from IP
+    iptables:
+      chain: INPUT
+      protocol: tcp
+      destination_port: 80
+      source: '{{ machine.server[0].ip_addresses[0].address }}'
+      jump: ACCEPT
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - name: Firewall rule - drop any traffic without rule
+    iptables:
+      chain: INPUT
+      protocol: tcp
+      destination_port: 80
+      jump: DROP
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+  - copy:
+     content: |
+      iptables-save > /etc/iptables.rules
+     dest: /etc/iptables.sh
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - name: Changing perm of "iptables.sh", adding "+x"
+    file: dest=/etc/iptables.sh mode=a+x
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - name: run iptables save
+    command: bash /etc/iptables.sh
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - copy:
+     content: |
+      echo "@reboot root iptables-restore < /etc/iptables.rules" >> /etc/crontab
+     dest: /etc/iptablescron.sh
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - name: Changing perm of "iptablescron.sh", adding "+x"
+    file: dest=/etc/iptablescron.sh mode=a+x
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+
+  - name: run iptables save
+    command: bash /etc/iptablescron.sh
+    delegate_to: '{{ machine.server[2].ip_addresses[0].address }}'
+#fw---
+
+  - name: Firewall rule - allow established connections
+    iptables:
+      chain: INPUT
+      ctstate: ESTABLISHED,RELATED
+      jump: ACCEPT
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: Allow from IP
+    iptables:
+      chain: INPUT
+      protocol: tcp
+      destination_port: 80
+      source: '{{ machine.server[0].ip_addresses[0].address }}'
+      jump: ACCEPT
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: Firewall rule - drop any traffic without rule
+    iptables:
+      chain: INPUT
+      protocol: tcp
+      destination_port: 80
+      jump: DROP
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - copy:
+     content: |
+      iptables-save > /etc/iptables.rules
+     dest: /etc/iptables.sh
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: Changing perm of "iptables.sh", adding "+x"
+    file: dest=/etc/iptables.sh mode=a+x
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: run iptables save
+    command: bash /etc/iptables.sh
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - copy:
+     content: |
+      echo "@reboot root iptables-restore < /etc/iptables.rules" >> /etc/crontab
+     dest: /etc/iptablescron.sh
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: Changing perm of "iptablescron.sh", adding "+x"
+    file: dest=/etc/iptablescron.sh mode=a+x
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
+
+  - name: run iptables save
+    command: bash /etc/iptablescron.sh
+    delegate_to: '{{ machine.server[1].ip_addresses[0].address }}'
