@@ -23,3 +23,7 @@ export ANSIBLE_HOST_KEY_CHECKING=False
 - Edit main.yml and enter your project ID.
 
 - Run ansible playbook with command : ansible-playbook main.yml
+
+<h1>Results </h1>
+
+- Once all tasks done, open main server IP address in web browser and refresh page few times, it should balance connections between web1 and web2 servers. Firewall do not allow to access web1 and web2 websites dirrectly, so only main server can access web1 and web2 apache server.
